@@ -1,35 +1,35 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { prisma, initDb } from '@/lib/db';
+
+let dbInitialized = false;
+
+async function ensureDb() {
+  if (!dbInitialized) {
+    await initDb();
+    dbInitialized = true;
+  }
+}
 
 // GET /api/alerts/history - 获取预警历史
 export async function GET(request: Request) {
   try {
+    await ensureDb();
+    
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const limit = parseInt(searchParams.get('limit') || '50');
     const hours = parseInt(searchParams.get('hours') || '24');
     
-    let sql = `
-      SELECT 
-        h.*,
-        w.name as stock_name,
-        w.market
-      FROM alert_history h
-      LEFT JOIN watchlist w ON h.code = w.code
-      WHERE h.created_at > DATE_SUB(NOW(), INTERVAL ? HOUR)
-    `;
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
     
-    const params: any[] = [hours];
-    
-    if (code) {
-      sql += ' AND h.code = ?';
-      params.push(code);
-    }
-    
-    sql += ' ORDER BY h.created_at DESC LIMIT ?';
-    params.push(limit);
-    
-    const history = await query(sql, params);
+    const history = await prisma.alertHistory.findMany({
+      where: {
+        createdAt: { gte: since },
+        ...(code && { code })
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    });
     
     return NextResponse.json({
       success: true,
@@ -49,17 +49,21 @@ export async function GET(request: Request) {
 // DELETE /api/alerts/history - 清理旧预警历史
 export async function DELETE(request: Request) {
   try {
+    await ensureDb();
+    
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '7');
     
-    await query(
-      'DELETE FROM alert_history WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
-      [days]
-    );
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    
+    const result = await prisma.alertHistory.deleteMany({
+      where: { createdAt: { lt: since } }
+    });
     
     return NextResponse.json({
       success: true,
-      message: `Alert history older than ${days} days cleaned`
+      message: `Cleaned ${result.count} old alert records`,
+      deleted: result.count
     });
     
   } catch (error) {

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query, initDb } from '@/lib/db';
-import { Stock } from '@/types/stock';
+import { prisma, initDb } from '@/lib/db';
 
 // 确保数据库初始化
 let dbInitialized = false;
@@ -16,27 +15,23 @@ async function ensureDb() {
 export async function GET() {
   try {
     await ensureDb();
-    const stocks = await query<Stock>(`
-      SELECT id, code, name, market, type, cost, alerts_json, created_at, updated_at 
-      FROM watchlist 
-      ORDER BY created_at DESC
-    `);
     
-    // 解析 alerts_json
+    const stocks = await prisma.watchlist.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    // 解析 alertsJson
     const parsedStocks = stocks.map(stock => ({
       ...stock,
-      alerts: JSON.parse(stock.alerts_json as unknown as string || '{}')
+      alerts: JSON.parse(stock.alertsJson || '{}')
     }));
-
-    return NextResponse.json({ 
-      success: true, 
-      data: parsedStocks,
-      count: parsedStocks.length 
-    });
+    
+    return NextResponse.json({ success: true, data: parsedStocks });
+    
   } catch (error) {
-    console.error('GET /api/stocks error:', error);
+    console.error('Database error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch stocks' },
+      { success: false, error: 'Database error' },
       { status: 500 }
     );
   }
@@ -47,28 +42,45 @@ export async function POST(request: Request) {
   try {
     await ensureDb();
     const body = await request.json();
+    
     const { code, name, market, type, cost, alerts } = body;
-
+    
     if (!code || !name || !market) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
       );
     }
-
-    await query(
-      `INSERT INTO watchlist (code, name, market, type, cost, alerts_json) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [code, name, market, type || 'individual', cost || 0, JSON.stringify(alerts || {})]
-    );
-
+    
+    const stock = await prisma.watchlist.create({
+      data: {
+        code,
+        name,
+        market,
+        type: type || 'individual',
+        cost: cost || 0,
+        alertsJson: JSON.stringify(alerts || {})
+      }
+    });
+    
+    // 记录日志
+    await prisma.auditLog.create({
+      data: {
+        action: 'CREATE',
+        code,
+        details: `Created stock: ${name} (${code})`,
+        agentId: 'web-ui'
+      }
+    });
+    
     return NextResponse.json({ 
       success: true, 
-      message: 'Stock created successfully' 
+      data: { ...stock, alerts: JSON.parse(stock.alertsJson) }
     });
+    
   } catch (error: any) {
-    console.error('POST /api/stocks error:', error);
-    if (error.code === 'ER_DUP_ENTRY') {
+    console.error('Create stock error:', error);
+    if (error.code === 'P2002') {
       return NextResponse.json(
         { success: false, error: 'Stock code already exists' },
         { status: 409 }
@@ -80,3 +92,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const dynamic = 'force-dynamic';

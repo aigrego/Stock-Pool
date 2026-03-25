@@ -15,9 +15,9 @@
         │
         ▼
 ┌─────────────────┐
-│   Next.js       │ 
-│   Web UI + API  │ ───► TiDB Serverless
-│                 │      (MySQL)
+│   Next.js 14    │ 
+│   + Prisma ORM  │ ───► TiDB Serverless
+│   + Recharts    │      (MySQL)
 └─────────────────┘
 ```
 
@@ -25,7 +25,7 @@
 
 ```
 shared-stockpool/
-├── web/                   # 🆕 Next.js + TiDB 新版 (推荐)
+├── web/                   # 🆕 Next.js + Prisma + TiDB 新版
 │   ├── app/              
 │   │   ├── api/
 │   │   │   ├── stocks/route.ts         # 股票 CRUD API
@@ -44,10 +44,13 @@ shared-stockpool/
 │   │   ├── stock-chart.tsx # K线图表组件
 │   │   └── stock-detail-modal.tsx
 │   ├── lib/
-│   │   ├── db.ts           # TiDB 数据库连接
+│   │   ├── prisma.ts       # Prisma Client 封装
+│   │   ├── db.ts           # 数据库导出
 │   │   ├── alerts.ts       # 预警规则引擎
 │   │   ├── feishu.ts       # 飞书推送服务
 │   │   └── technical.ts    # 技术指标计算
+│   ├── prisma/
+│   │   └── schema.prisma   # Prisma Schema
 │   ├── hooks/useRealtimeData.ts
 │   └── README.md
 ├── server.py              # 原版 Python API (已弃用)
@@ -57,14 +60,39 @@ shared-stockpool/
 
 ## 🚀 快速开始
 
-### Next.js + TiDB 新版
+### Next.js + Prisma + TiDB 新版
 
 ```bash
 cd web
+
+# 1. 安装依赖
 npm install
+
+# 2. 配置环境变量
 cp .env.local.example .env.local
-# 配置 TiDB + 飞书 Webhook
+# 编辑 .env.local，填入 TiDB 连接信息
+
+# 3. 生成 Prisma Client
+npx prisma generate
+
+# 4. 推送到数据库（自动创建表）
+npx prisma db push
+
+# 5. 启动开发服务器
 npm run dev
+```
+
+### Prisma 常用命令
+
+```bash
+# 生成 Client（schema 变更后执行）
+npx prisma generate
+
+# 推送 schema 到数据库（创建/更新表）
+npx prisma db push
+
+# 查看数据库（可选）
+npx prisma studio
 ```
 
 ## 🖥️ Web 界面功能

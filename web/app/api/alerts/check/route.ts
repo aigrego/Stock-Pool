@@ -1,161 +1,75 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
-import { 
-  checkStockAlerts, 
-  getStocksWithAlerts, 
-  isTradingTime,
-  AlertCheckResult 
-} from '@/lib/alerts';
-import { pushAlertsToFeishu, initAlertHistoryTable } from '@/lib/feishu';
+import { prisma, initDb } from '@/lib/db';
+import { checkStockAlerts } from '@/lib/alerts';
+import { pushAlertsToFeishu } from '@/lib/feishu';
 
-// 转换股票代码为新浪财经格式
-function toSinaCode(code: string, market: string): string {
-  if (market === 'hk') return `rt_hk${code}`;
-  if (market === 'us') return `gb_${code.toLowerCase()}`;
-  if (market === 'sh') return `sh${code}`;
-  if (market === 'sz') return `sz${code}`;
-  return code;
-}
+let dbInitialized = false;
 
-// 批量获取实时数据
-async function fetchRealtimeData(
-  codes: string[],
-  markets: string[]
-): Promise<Record<string, { current: number; changePct: number; volume: number; name: string }>> {
-  if (codes.length === 0) return {};
-
-  const sinaCodes = codes.map((code, i) => toSinaCode(code, markets[i]));
-  const url = `https://hq.sinajs.cn/list=${sinaCodes.join(',')}`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'Referer': 'https://finance.sina.com.cn',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
-
-    if (!response.ok) throw new Error(`Sina error: ${response.status}`);
-
-    const buffer = await response.arrayBuffer();
-    const text = new TextDecoder('gb2312').decode(buffer);
-    
-    const result: Record<string, any> = {};
-    
-    for (const line of text.split('\n')) {
-      if (!line.includes('=')) continue;
-      
-      const [keyPart, valuePart] = line.split('=');
-      const codeKey = keyPart.split('_').pop()?.replace(/^(sh|sz|hk|bj|rt_hk|gb_)/, '');
-      const dataStr = valuePart?.trim().replace(/[";]/g, '');
-      
-      if (!codeKey || !dataStr) continue;
-      const parts = dataStr.split(',');
-      if (parts.length < 33) continue;
-
-      const code = codeKey.toUpperCase();
-      const current = parseFloat(parts[3]);
-      const close = parseFloat(parts[2]);
-      
-      result[code] = {
-        name: parts[0],
-        current,
-        changePct: close > 0 ? Math.round((current - close) / close * 10000) / 100 : 0,
-        volume: parseInt(parts[8])
-      };
-    }
-
-    return result;
-  } catch (error) {
-    console.error('Failed to fetch realtime data:', error);
-    return {};
+async function ensureDb() {
+  if (!dbInitialized) {
+    await initDb();
+    dbInitialized = true;
   }
 }
 
-// GET /api/alerts/check - 手动触发预警检查
+// GET /api/alerts/check - 检查预警
 export async function GET(request: Request) {
   try {
-    // 获取查询参数
+    await ensureDb();
+    
     const { searchParams } = new URL(request.url);
-    const skipTradingCheck = searchParams.get('force') === 'true';
-    const skipFeishu = searchParams.get('nofeishu') === 'true';
+    const force = searchParams.get('force') === 'true';
+    const noFeishu = searchParams.get('nofeishu') === 'true';
     
-    // 检查是否在交易时间（除非强制检查）
-    if (!skipTradingCheck && !isTradingTime()) {
-      return NextResponse.json({
-        success: true,
-        message: 'Not in trading hours, skipping alert check',
-        isTradingTime: false,
-        alerts: []
-      });
-    }
+    // 获取所有股票
+    const stocks = await prisma.watchlist.findMany();
     
-    // 初始化表
-    await initAlertHistoryTable();
-    
-    // 获取带预警配置的股票
-    const stocks = await getStocksWithAlerts();
-    
-    if (stocks.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'No stocks with alert configuration',
-        alerts: []
-      });
-    }
-    
-    // 获取实时数据
-    const codes = stocks.map(s => s.code);
-    const markets = await query<{ code: string; market: string }>('SELECT code, market FROM watchlist WHERE code IN (?)', [codes]);
-    const marketMap = Object.fromEntries(markets.map(m => [m.code, m.market]));
-    
-    const realtimeData = await fetchRealtimeData(
-      codes,
-      codes.map(c => marketMap[c] || 'sh')
-    );
+    // 解析 alertsJson
+    const parsedStocks = stocks.map(s => ({
+      ...s,
+      alerts: JSON.parse(s.alertsJson || '{}')
+    }));
     
     // 检查预警
-    const allAlerts: AlertCheckResult[] = [];
+    const triggeredAlerts = await checkStockAlerts(parsedStocks);
     
-    for (const stock of stocks) {
-      const data = realtimeData[stock.code];
-      if (!data) continue;
-      
-      const alerts = checkStockAlerts(stock, {
-        current: data.current,
-        changePct: data.changePct,
-        volume: data.volume
+    // 保存到数据库（去重逻辑在 checkStockAlerts 中处理）
+    for (const alert of triggeredAlerts) {
+      await prisma.alertHistory.create({
+        data: {
+          code: alert.code,
+          alertType: alert.type,
+          severity: alert.severity,
+          message: alert.message,
+          currentValue: alert.currentValue,
+          thresholdValue: alert.thresholdValue
+        }
       });
-      
-      allAlerts.push(...alerts);
     }
     
-    // 推送到飞书
-    let feishuResult = { sent: false, count: 0 };
-    if (!skipFeishu && allAlerts.length > 0) {
-      feishuResult = await pushAlertsToFeishu(allAlerts, {
-        skipDuplicate: true,
-        duplicateMinutes: 30
-      });
+    // 推送飞书
+    let feishuResult = null;
+    if (!noFeishu && triggeredAlerts.length > 0) {
+      feishuResult = await pushAlertsToFeishu(triggeredAlerts);
     }
     
     return NextResponse.json({
       success: true,
-      isTradingTime: true,
-      stocksChecked: stocks.length,
-      alertsFound: allAlerts.length,
-      alerts: allAlerts,
-      feishu: feishuResult
+      data: {
+        alertsFound: triggeredAlerts.length,
+        alerts: triggeredAlerts,
+        feishuPushed: !noFeishu && feishuResult?.success,
+        force
+      }
     });
     
   } catch (error) {
     console.error('Alert check error:', error);
     return NextResponse.json(
-      { success: false, error: 'Alert check failed', details: (error as Error).message },
+      { success: false, error: 'Failed to check alerts' },
       { status: 500 }
     );
   }
 }
 
-// 配置 - 支持 Vercel Cron
 export const dynamic = 'force-dynamic';
