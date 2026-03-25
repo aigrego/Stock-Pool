@@ -13,11 +13,11 @@ async function ensureDb() {
 // GET /api/stocks/[code] - 获取单个股票
 export async function GET(
   request: Request,
-  { params }: { params: { code: string } }
+  { params }: { params: Promise<{ code: string }> }
 ) {
   try {
     await ensureDb();
-    const code = params.code;
+    const { code } = await params;
     
     const stock = await prisma.watchlist.findUnique({
       where: { code }
@@ -50,11 +50,11 @@ export async function GET(
 // PUT /api/stocks/[code] - 更新股票
 export async function PUT(
   request: Request,
-  { params }: { params: { code: string } }
+  { params }: { params: Promise<{ code: string }> }
 ) {
   try {
     await ensureDb();
-    const code = params.code;
+    const { code } = await params;
     const body = await request.json();
     
     const { name, market, type, cost, alerts } = body;
@@ -106,11 +106,11 @@ export async function PUT(
 // DELETE /api/stocks/[code] - 删除股票
 export async function DELETE(
   request: Request,
-  { params }: { params: { code: string } }
+  { params }: { params: Promise<{ code: string }> }
 ) {
   try {
     await ensureDb();
-    const code = params.code;
+    const { code } = await params;
     
     const stock = await prisma.watchlist.delete({
       where: { code }

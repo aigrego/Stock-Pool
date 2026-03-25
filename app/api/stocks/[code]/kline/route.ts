@@ -109,14 +109,14 @@ async function fetchEastMoneyKLine(code: string, market: string, period: string 
 // GET /api/stocks/[code]/kline - 获取K线数据
 export async function GET(
   request: Request,
-  { params }: { params: { code: string } }
+  { params }: { params: Promise<{ code: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
     const market = searchParams.get('market') || 'sh';
     const period = searchParams.get('period') || 'day';
     
-    const code = params.code;
+    const { code } = await params;
     
     // 尝试多个数据源
     let data = await fetchEastMoneyKLine(code, market, period);
