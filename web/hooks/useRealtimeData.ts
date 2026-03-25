@@ -12,14 +12,17 @@ export interface RealtimeStock {
   low: number;
   volume: number;
   amount: number;
-  bid1: number;
-  ask1: number;
   changePct: number;
   pnlPct: number;
   pnlAmount: number;
   cost: number;
-  date: string;
-  time: string;
+  source?: string;
+}
+
+interface RealtimeMeta {
+  source: string;
+  count: number;
+  total: number;
 }
 
 interface UseRealtimeOptions {
@@ -31,6 +34,7 @@ export function useRealtimeData(options: UseRealtimeOptions = {}) {
   const { interval = 5000, enabled = true } = options;
   
   const [data, setData] = useState<Record<string, RealtimeStock>>({});
+  const [meta, setMeta] = useState<RealtimeMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -43,6 +47,7 @@ export function useRealtimeData(options: UseRealtimeOptions = {}) {
       const result = await response.json();
       if (result.success) {
         setData(result.data);
+        setMeta(result.meta || null);
         setLastUpdated(new Date());
         setError(null);
       }
@@ -73,10 +78,11 @@ export function useRealtimeData(options: UseRealtimeOptions = {}) {
 
   return {
     data,
+    meta,
     loading,
     error,
     lastUpdated,
     refresh,
-    connected: !error  // 模拟连接状态
+    connected: !error
   };
 }

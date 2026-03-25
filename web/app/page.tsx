@@ -48,7 +48,7 @@ export default function Home() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   // 实时数据轮询（5秒间隔）
-  const { data: realtimeData, loading: realtimeLoading, lastUpdated, refresh: refreshRealtime } = useRealtimeData({ interval: 5000 });
+  const { data: realtimeData, meta: realtimeMeta, loading: realtimeLoading, lastUpdated, refresh: refreshRealtime } = useRealtimeData({ interval: 5000 });
 
   const [formData, setFormData] = useState<Partial<Stock>>({
     code: '',
@@ -204,14 +204,17 @@ export default function Home() {
           
           <div className="flex items-center gap-3">
             {/* 实时数据状态 */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
-              !realtimeLoading 
-                ? 'bg-green-500/10 border-green-500/30 text-green-400' 
-                : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
-            }`}>
+            <div 
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
+                !realtimeLoading 
+                  ? 'bg-green-500/10 border-green-500/30 text-green-400' 
+                  : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+              }`}
+              title={`数据源: ${realtimeMeta?.source || 'unknown'} | 成功: ${realtimeMeta?.count || 0}/${realtimeMeta?.total || 0}`}
+            >
               <Activity className="w-4 h-4" />
               <span className="text-sm hidden sm:inline">
-                {realtimeLoading ? '更新中...' : '实时'}
+                {realtimeLoading ? '更新中...' : (realtimeMeta?.source || '实时')}
               </span>
             </div>
 
