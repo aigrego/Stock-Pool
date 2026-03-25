@@ -14,6 +14,15 @@ async function ensureDb() {
 // GET /api/stocks - 获取所有股票
 export async function GET() {
   try {
+    // 检查环境变量
+    if (!process.env.DATABASE_URL) {
+      console.error('DATABASE_URL not set');
+      return NextResponse.json(
+        { success: false, error: 'DATABASE_URL not configured' },
+        { status: 500 }
+      );
+    }
+
     await ensureDb();
     
     const stocks = await prisma.watchlist.findMany({
@@ -28,10 +37,10 @@ export async function GET() {
     
     return NextResponse.json({ success: true, data: parsedStocks });
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Database error:', error);
     return NextResponse.json(
-      { success: false, error: 'Database error' },
+      { success: false, error: 'Database error', details: error?.message || String(error) },
       { status: 500 }
     );
   }
