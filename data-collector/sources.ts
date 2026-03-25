@@ -187,7 +187,7 @@ export async function fetchFromEastMoney(codes: string[]): Promise<StockQuote[]>
     }
   });
   
-  const data = await response.json();
+  const data = await response.json() as { data?: { diff?: any[] } };
   const quotes: StockQuote[] = [];
   
   if (data.data?.diff) {

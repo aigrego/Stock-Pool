@@ -34,14 +34,22 @@ const BASE_URL = process.env.STOCK_API_URL || 'http://localhost:3000/api';
 export async function getStocks(): Promise<Stock[]> {
   const response = await fetch(`${BASE_URL}/stocks`);
   if (!response.ok) throw new Error(`获取股票失败: ${response.status}`);
-  return response.json();
+  const data = await response.json() as { success?: boolean; data?: Stock[] };
+  if (data.success && Array.isArray(data.data)) {
+    return data.data;
+  }
+  return [];
 }
 
 // 获取统计数据
 export async function getStats(): Promise<StockStats> {
   const response = await fetch(`${BASE_URL}/stats`);
   if (!response.ok) throw new Error(`获取统计失败: ${response.status}`);
-  return response.json();
+  const data = await response.json() as { success?: boolean; data?: StockStats };
+  if (data.success && data.data) {
+    return data.data;
+  }
+  return { total: 0, sh: 0, sz: 0, hk: 0, us: 0, bj: 0, fx: 0, individual: 0, etf: 0, gold: 0 };
 }
 
 // 更新股票成本价（通过 API）

@@ -8,6 +8,12 @@
 !.yarn/releases
 !.yarn/versions
 
+# data-collector
+data-collector/node_modules/
+data-collector/dist/
+data-collector/logs/
+data-collector/package-lock.json
+
 # testing
 /coverage
 
