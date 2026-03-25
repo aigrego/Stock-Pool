@@ -1,123 +1,107 @@
-# 📊 Shared Stock Pool - Tailscale 共享股票池
+# 📊 股票池管理 | Stock Pool Manager
 
-在 Tailnet 网络内共享股票池配置，提供 Web 管理界面和 REST API。
-
-> 🆕 **新版 Web 界面**: `web/` 目录包含基于 Next.js + TiDB 的全新版本（推荐）
+基于 Next.js + Prisma + TiDB 的智能股票池管理系统，支持实时监控、K线图分析和技术指标预警。
 
 ## 🏗️ 架构
 
 ```
-┌─────────────────┐     Tailnet      ┌─────────────────┐
-│   kimiclaw      │ ◄─────────────────│   livebook      │
-│  100.111.204.29 │   HTTP/Web       │  100.91.86.110  │
-│   (Server)      │                  │   (Client)      │
-└─────────────────┘                  └─────────────────┘
-        │
-        ▼
 ┌─────────────────┐
 │   Next.js 14    │ 
-│   + Prisma ORM  │ ───► TiDB Serverless
-│   + Recharts    │      (MySQL)
+│   + Prisma ORM  │ ───► TiDB Serverless (MySQL)
+│   + Recharts    │
 └─────────────────┘
 ```
 
 ## 📁 项目结构
 
 ```
-shared-stockpool/
-├── web/                   # 🆕 Next.js + Prisma + TiDB 新版
-│   ├── app/              
-│   │   ├── api/
-│   │   │   ├── stocks/route.ts         # 股票 CRUD API
-│   │   │   ├── stocks/[code]/route.ts  # 单个股票操作
-│   │   │   ├── stocks/[code]/kline/route.ts  # K线数据
-│   │   │   ├── stats/route.ts          # 统计数据
-│   │   │   ├── realtime/route.ts       # 实时股价 (多源轮询)
-│   │   │   └── alerts/                 # 预警系统
-│   │   │       ├── check/route.ts
-│   │   │       └── history/route.ts
-│   │   ├── page.tsx        # 主页面
-│   │   ├── layout.tsx      # 根布局
-│   │   └── globals.css     # 暗黑主题
-│   ├── components/
-│   │   ├── ui/             # shadcn/ui 组件
-│   │   ├── stock-chart.tsx # K线图表组件
-│   │   └── stock-detail-modal.tsx
-│   ├── lib/
-│   │   ├── prisma.ts       # Prisma Client 封装
-│   │   ├── db.ts           # 数据库导出
-│   │   ├── alerts.ts       # 预警规则引擎
-│   │   ├── feishu.ts       # 飞书推送服务
-│   │   └── technical.ts    # 技术指标计算
-│   ├── prisma/
-│   │   └── schema.prisma   # Prisma Schema
-│   ├── hooks/useRealtimeData.ts
-│   └── README.md
-├── server.py              # 原版 Python API (已弃用)
-├── client.py              # Python 客户端库
-└── stockpool.db           # SQLite (原版)
+stock-pool/
+├── app/                    # Next.js App Router
+│   ├── api/
+│   │   ├── stocks/         # 股票 CRUD API
+│   │   ├── stocks/[code]/  # 单个股票操作
+│   │   ├── stats/          # 统计数据
+│   │   ├── realtime/       # 实时股价 (多源轮询)
+│   │   └── alerts/         # 预警系统
+│   ├── page.tsx            # 主页面
+│   ├── layout.tsx          # 根布局
+│   └── globals.css         # 暗黑主题
+├── components/
+│   ├── ui/                 # shadcn/ui 组件
+│   ├── stock-chart.tsx     # K线图表组件
+│   └── stock-detail-modal.tsx
+├── lib/
+│   ├── prisma.ts           # Prisma Client 封装
+│   ├── alerts.ts           # 预警规则引擎
+│   ├── feishu.ts           # 飞书推送服务
+│   └── technical.ts        # 技术指标计算
+├── prisma/
+│   └── schema.prisma       # Prisma Schema
+├── hooks/useRealtimeData.ts
+└── README.md
 ```
 
 ## 🚀 快速开始
 
-### Next.js + Prisma + TiDB 新版
+### 1. 安装依赖
 
 ```bash
-cd web
-
-# 1. 安装依赖
 npm install
+```
 
-# 2. 配置环境变量
+### 2. 配置环境变量
+
+```bash
 cp .env.local.example .env.local
 # 编辑 .env.local，填入 TiDB 连接信息
+```
 
-# 3. 生成 Prisma Client
+```env
+# TiDB Serverless
+DATABASE_URL=mysql://user:password@host:port/stockpool?ssl=true
+
+# 飞书推送 (可选)
+FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+```
+
+### 3. 初始化数据库
+
+```bash
 npx prisma generate
-
-# 4. 推送到数据库（自动创建表）
 npx prisma db push
+```
 
-# 5. 启动开发服务器
+### 4. 启动开发服务器
+
+```bash
 npm run dev
 ```
 
-### Prisma 常用命令
+访问 http://localhost:3000
 
-```bash
-# 生成 Client（schema 变更后执行）
-npx prisma generate
+## 🖥️ 功能特性
 
-# 推送 schema 到数据库（创建/更新表）
-npx prisma db push
-
-# 查看数据库（可选）
-npx prisma studio
-```
-
-## 🖥️ Web 界面功能
-
-### Stage 1: 基础管理
+### Stage 1: 基础管理 ✅
 - 📊 **仪表盘** - 4 卡片统计布局
 - 🔍 **搜索筛选** - 实时搜索 + 类型/市场筛选  
 - ➕ **添加股票** - 弹窗表单，含预警配置
 - ✏️ **编辑股票** - 点击编辑，数据回填
 - 🗑️ **删除股票** - 确认删除
 
-### Stage 2: 实时数据
+### Stage 2: 实时数据 ✅
 - 📈 **实时股价** - 5秒轮询多源数据
 - 🔄 **多数据源** - 新浪财经、腾讯、东方财富（故障自动切换）
 - 💰 **持仓盈亏** - 实时计算成本vs现价盈亏
 - 🔔 **浏览器通知** - 桌面提醒支持
 
-### Stage 3: 预警系统
+### Stage 3: 预警系统 ✅
 - ⚠️ **预警规则引擎** - 成本/日内涨跌/成交量监控
 - 📨 **飞书推送** - 自动发送卡片消息
 - 🕐 **定时检查** - Vercel Cron 每5分钟自动检查
 - 📜 **预警历史** - 24小时内预警记录查询
 - 🚫 **防重复** - 30分钟内相同预警不重复发送
 
-### Stage 4: 技术分析
+### Stage 4: 技术分析 ✅
 - 📉 **K线图** - 点击股票查看日K线走势
 - 📊 **技术指标**:
   - MA (5/10/20/60日均线)
@@ -146,43 +130,51 @@ npx prisma studio
 ### Vercel
 
 ```bash
-cd web
 vercel --prod
 ```
 
 ### 环境变量
 
-支持两种配置方式（优先使用 `DATABASE_URL`）：
+在 Vercel Dashboard → Project Settings → Environment Variables 添加：
 
-```bash
-# 方式1: DATABASE_URL (推荐)
-DATABASE_URL=mysql://user:password@host:port/stockpool?ssl=true
-
-# 方式2: 分开配置（当 DATABASE_URL 不存在时使用）
-DB_HOST=xxx.tidbcloud.com
-DB_PORT=4000
-DB_USER=xxx
-DB_PASSWORD=xxx
-DB_NAME=stockpool
-TIDB_SSL=true
-
-# 飞书推送 (可选)
-FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
-```
+| 变量名 | 说明 |
+|--------|------|
+| `DATABASE_URL` | TiDB 连接字符串 |
+| `FEISHU_WEBHOOK_URL` | 飞书机器人 Webhook (可选) |
 
 ### Vercel Cron 配置
 
-已配置在 `vercel.json`:
+已配置在 `vercel.json`，每5分钟自动检查预警（仅工作日）：
+
 ```json
 {
-  "crons": [
-    {
-      "path": "/api/alerts/check",
-      "schedule": "*/5 * * * 1-5"
-    }
-  ]
+  "crons": [{
+    "path": "/api/alerts/check",
+    "schedule": "*/5 * * * 1-5"
+  }]
 }
 ```
+
+## 🧰 Prisma 常用命令
+
+```bash
+# 生成 Client（schema 变更后执行）
+npx prisma generate
+
+# 推送 schema 到数据库
+npx prisma db push
+
+# 查看数据库
+npx prisma studio
+```
+
+## ⚙️ 技术栈
+
+- Next.js 14 + TypeScript
+- Tailwind CSS + shadcn/ui
+- Prisma ORM + TiDB Serverless
+- Recharts (图表)
+- 多数据源实时行情（新浪/腾讯/东财）
 
 ---
 
