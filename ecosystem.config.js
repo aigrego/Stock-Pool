@@ -11,7 +11,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         FETCH_INTERVAL: '5',
-        STOCK_API_URL: 'https://your-vercel-app.vercel.app/api',
+        STOCK_API_URL: 'https://pool.aigrego.com/api',
         WS_TARGET_URL: 'http://100.111.204.29:3001'
       },
       log_file: './data-collector/logs/collector.log',
