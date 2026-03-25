@@ -407,7 +407,7 @@ export default function Home() {
               />
             </div>
 
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v || '')}>
               <SelectTrigger className="w-[140px] bg-card border-border">
                 <SelectValue placeholder="全部类型" />
               </SelectTrigger>
@@ -419,7 +419,7 @@ export default function Home() {
               </SelectContent>
             </Select>
 
-            <Select value={marketFilter} onValueChange={setMarketFilter}>
+            <Select value={marketFilter} onValueChange={(v) => setMarketFilter(v || '')}>
               <SelectTrigger className="w-[140px] bg-card border-border">
                 <SelectValue placeholder="全部市场" />
               </SelectTrigger>

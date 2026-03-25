@@ -46,12 +46,17 @@ interface ChartData {
   bollLower?: number;
 }
 
+interface CurrentPrice {
+  close: number;
+  changePct: number;
+}
+
 export function StockChart({ code, market, name }: StockChartProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [patterns, setPatterns] = useState<any[]>([]);
-  const [currentPrice, setCurrentPrice] = useState<{ close: number; changePct: number }> | null>(null);
+  const [currentPrice, setCurrentPrice] = useState<CurrentPrice | null>(null);
 
   useEffect(() => {
     fetchKLineData();

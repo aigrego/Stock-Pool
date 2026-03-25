@@ -21,8 +21,8 @@ interface StockDetailModalProps {
 export function StockDetailModal({ stock, open, onOpenChange }: StockDetailModalProps) {
   if (!stock) return null;
 
-  const isProfit = stock.pnl_pct > 0;
-  const isUp = stock.change_pct > 0;
+  const isProfit = stock.pnlPct > 0;
+  const isUp = stock.changePct > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -41,7 +41,7 @@ export function StockDetailModal({ stock, open, onOpenChange }: StockDetailModal
                 variant="outline" 
                 className={`text-lg px-3 py-1 ${isUp ? 'text-green-400 border-green-400/30 bg-green-400/10' : 'text-red-400 border-red-400/30 bg-red-400/10'}`}
               >
-                {isUp ? '+' : ''}{stock.change_pct}%
+                {isUp ? '+' : ''}{stock.changePct}%
               </Badge>
             </div>
           </div>
@@ -79,14 +79,14 @@ export function StockDetailModal({ stock, open, onOpenChange }: StockDetailModal
                 <>
                   <TrendingUp className="w-5 h-5 text-green-400" />
                   <div className="text-2xl font-mono font-bold text-green-400">
-                    +{stock.pnl_pct}%
+                    +{stock.pnlPct}%
                   </div>
                 </>
               ) : (
                 <>
                   <TrendingDown className="w-5 h-5 text-red-400" />
                   <div className="text-2xl font-mono font-bold text-red-400">
-                    {stock.pnl_pct}%
+                    {stock.pnlPct}%
                   </div>
                 </>
               )}
@@ -99,7 +99,7 @@ export function StockDetailModal({ stock, open, onOpenChange }: StockDetailModal
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-mono font-bold ${isProfit ? 'text-green-400' : 'text-red-400'}`}>
-                {isProfit ? '+' : ''}¥{stock.pnl_amount?.toFixed(2) || '0.00'}
+                {isProfit ? '+' : ''}¥{stock.pnlAmount?.toFixed(2) || '0.00'}
               </div>
             </CardContent>
           </Card>
@@ -135,7 +135,7 @@ export function StockDetailModal({ stock, open, onOpenChange }: StockDetailModal
           <div className="mt-4 pt-4 border-t border-border">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="w-4 h-4" />
-              <span>最后更新: {stock.updated_at ? new Date(stock.updated_at).toLocaleString('zh-CN') : '-'}</span>
+              <span>最后更新: {stock.updatedAt ? new Date(stock.updatedAt).toLocaleString('zh-CN') : '-'}</span>
             </div>
           </div>
         )}

@@ -17,6 +17,8 @@ export interface RealtimeStock {
   pnlAmount: number;
   cost: number;
   source?: string;
+  market?: string;
+  updatedAt?: string;
 }
 
 interface RealtimeMeta {

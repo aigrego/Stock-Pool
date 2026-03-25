@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma, initDb } from '@/lib/db';
 import { checkStockAlerts } from '@/lib/alerts';
 import { pushAlertsToFeishu } from '@/lib/feishu';
+import { fetchRealtimeQuotes } from '@/lib/realtime';
 
 let dbInitialized = false;
 
@@ -24,16 +25,38 @@ export async function GET(request: Request) {
     // 获取所有股票
     const stocks = await prisma.watchlist.findMany();
     
-    // 解析 alertsJson
-    const parsedStocks = stocks.map(s => ({
-      ...s,
-      alerts: JSON.parse(s.alertsJson || '{}')
-    }));
+    // 获取实时行情
+    const codes = stocks.map(s => s.code);
+    const realtimeQuotes = await fetchRealtimeQuotes(codes);
     
-    // 检查预警
-    const triggeredAlerts = await checkStockAlerts(parsedStocks);
+    const triggeredAlerts: any[] = [];
     
-    // 保存到数据库（去重逻辑在 checkStockAlerts 中处理）
+    // 检查每只股票的预警
+    for (const stock of stocks) {
+      const quote = realtimeQuotes.find(q => q.code === stock.code);
+      if (!quote) continue;
+      
+      const alerts = JSON.parse(stock.alertsJson || '{}');
+      if (Object.keys(alerts).length === 0) continue;
+      
+      const stockConfig = {
+        code: stock.code,
+        name: stock.name,
+        cost: stock.cost,
+        alerts
+      };
+      
+      const stockAlerts = checkStockAlerts(stockConfig, {
+        current: quote.current,
+        changePct: quote.changePct,
+        volume: quote.volume,
+        avgVolume: quote.avgVolume
+      });
+      
+      triggeredAlerts.push(...stockAlerts);
+    }
+    
+    // 保存到数据库
     for (const alert of triggeredAlerts) {
       await prisma.alertHistory.create({
         data: {
@@ -48,9 +71,10 @@ export async function GET(request: Request) {
     }
     
     // 推送飞书
-    let feishuResult = null;
+    let feishuSent = false;
     if (!noFeishu && triggeredAlerts.length > 0) {
-      feishuResult = await pushAlertsToFeishu(triggeredAlerts);
+      const feishuResult = await pushAlertsToFeishu(triggeredAlerts);
+      feishuSent = feishuResult.sent;
     }
     
     return NextResponse.json({
@@ -58,7 +82,7 @@ export async function GET(request: Request) {
       data: {
         alertsFound: triggeredAlerts.length,
         alerts: triggeredAlerts,
-        feishuPushed: !noFeishu && feishuResult?.success,
+        feishuSent,
         force
       }
     });
