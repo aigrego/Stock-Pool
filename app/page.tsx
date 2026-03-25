@@ -28,7 +28,6 @@ import {
 } from '@/components/ui/dialog';
 import { Stock, StockStats, TypeLabels, MarketType, StockType, DefaultAlerts } from '@/types/stock';
 import { useRealtimeData } from '@/hooks/useRealtimeData';
-import { useSocket } from '@/hooks/useSocket';
 import { StockDetailModal } from '@/components/stock-detail-modal';
 import {
   Plus, Search, RefreshCw, TrendingUp, Wallet, BarChart3, Globe,
@@ -54,21 +53,6 @@ export default function Home() {
 
   // 实时数据轮询（5秒间隔）
   const { data: realtimeData, meta: realtimeMeta, loading: realtimeLoading, lastUpdated, refresh: refreshRealtime } = useRealtimeData({ interval: 5000 });
-  
-  // WebSocket 实时连接
-  const { isConnected: socketConnected, lastUpdate: socketLastUpdate } = useSocket({
-    onQuotes: (quotes) => {
-      // 更新实时数据
-      console.log('[WebSocket] 收到行情数据:', quotes.length);
-      // 可以在这里更新 UI 或触发其他操作
-    },
-    onConnect: () => {
-      console.log('[WebSocket] 连接成功');
-    },
-    onDisconnect: () => {
-      console.log('[WebSocket] 连接断开');
-    }
-  });
 
   const [formData, setFormData] = useState<Partial<Stock>>({
     code: '',
@@ -258,21 +242,6 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* WebSocket 连接状态 */}
-            <div
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
-                socketConnected
-                  ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                  : 'bg-red-500/10 border-red-500/30 text-red-400'
-              }`}
-              title={socketConnected ? 'WebSocket 已连接' : 'WebSocket 未连接'}
-            >
-              <div className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-              <span className="text-sm hidden sm:inline">
-                {socketConnected ? '已连接' : '未连接'}
-              </span>
-            </div>
-
             {/* 实时数据状态 */}
             <div
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
