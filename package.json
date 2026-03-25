@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "build:strict": "tsc --noEmit && next build",
+    "build": "prisma generate && next build",
+    "build:strict": "tsc --noEmit && prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
