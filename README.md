@@ -28,21 +28,26 @@ shared-stockpool/
 ├── web/                   # 🆕 Next.js + TiDB 新版 (推荐)
 │   ├── app/              
 │   │   ├── api/
-│   │   │   ├── stocks/route.ts      # 股票 CRUD API
+│   │   │   ├── stocks/route.ts         # 股票 CRUD API
 │   │   │   ├── stocks/[code]/route.ts  # 单个股票操作
-│   │   │   ├── stats/route.ts       # 统计数据
-│   │   │   ├── realtime/route.ts    # 实时股价 (多源轮询)
-│   │   │   └── alerts/              # 预警系统
-│   │   │       ├── check/route.ts   # 预警检查
-│   │   │       └── history/route.ts # 预警历史
+│   │   │   ├── stocks/[code]/kline/route.ts  # K线数据
+│   │   │   ├── stats/route.ts          # 统计数据
+│   │   │   ├── realtime/route.ts       # 实时股价 (多源轮询)
+│   │   │   └── alerts/                 # 预警系统
+│   │   │       ├── check/route.ts
+│   │   │       └── history/route.ts
 │   │   ├── page.tsx        # 主页面
 │   │   ├── layout.tsx      # 根布局
 │   │   └── globals.css     # 暗黑主题
-│   ├── components/ui/      # shadcn/ui 组件
+│   ├── components/
+│   │   ├── ui/             # shadcn/ui 组件
+│   │   ├── stock-chart.tsx # K线图表组件
+│   │   └── stock-detail-modal.tsx
 │   ├── lib/
 │   │   ├── db.ts           # TiDB 数据库连接
 │   │   ├── alerts.ts       # 预警规则引擎
-│   │   └── feishu.ts       # 飞书推送服务
+│   │   ├── feishu.ts       # 飞书推送服务
+│   │   └── technical.ts    # 技术指标计算
 │   ├── hooks/useRealtimeData.ts
 │   └── README.md
 ├── server.py              # 原版 Python API (已弃用)
@@ -84,27 +89,15 @@ npm run dev
 - 📜 **预警历史** - 24小时内预警记录查询
 - 🚫 **防重复** - 30分钟内相同预警不重复发送
 
-### 支持的预警规则
-
-| 规则 | 说明 | 严重级别 |
-|------|------|----------|
-| `cost_pct_above` | 成本盈利超过设定比例 | 提示 |
-| `cost_pct_below` | 成本亏损超过设定比例 | 警告/严重 |
-| `change_pct_above` | 日内涨幅超过设定比例 | 提示 |
-| `change_pct_below` | 日内跌幅超过设定比例 | 警告 |
-| `volume_surge` | 成交量放大超过设定倍数 | 提示 |
-| `ma_monitor` | 均线金叉死叉（预留） | - |
-| `rsi_monitor` | RSI超买超卖（预留） | - |
-| `gap_monitor` | 跳空缺口（预留） | - |
-
-### 技术栈
-
-- Next.js 14 + TypeScript
-- Tailwind CSS + shadcn/ui
-- TiDB Serverless (MySQL)
-- 多数据源实时行情（新浪/腾讯/东财）
-- Vercel Cron（定时任务）
-- 飞书机器人 Webhook
+### Stage 4: 技术分析
+- 📉 **K线图** - 点击股票查看日K线走势
+- 📊 **技术指标**:
+  - MA (5/10/20/60日均线)
+  - MACD (DIF/DEA/MACD)
+  - RSI (6/12/24相对强弱指标)
+  - 布林带 (上轨/中轨/下轨)
+- 🔍 **形态识别** - 锤子线、十字星、吞没形态、三连阳/三连阴
+- 📈 **图表切换** - K线/MACD/RSI 三种视图
 
 ## 📡 API 端点
 
@@ -114,6 +107,7 @@ npm run dev
 | POST | `/api/stocks` | 创建股票 |
 | PUT | `/api/stocks/{code}` | 更新股票 |
 | DELETE | `/api/stocks/{code}` | 删除股票 |
+| GET | `/api/stocks/{code}/kline` | 获取K线数据 |
 | GET | `/api/stats` | 获取统计数据 |
 | GET | `/api/realtime` | 获取实时股价 |
 | GET | `/api/alerts/check` | 手动触发预警检查 |
@@ -158,12 +152,11 @@ FEISHU_USER_ID=ou_xxx
 }
 ```
 
-每5分钟自动检查一次（仅工作日交易时段生效）
-
 ---
 
 ## 📝 版本历史
 
+- **v4.0** (2026-03-25) - Stage 4: K线图 + 技术指标 (MA/MACD/RSI/布林带) + 形态识别
 - **v3.0** (2026-03-25) - Stage 3: 预警规则引擎 + 飞书推送
 - **v2.0** (2026-03-25) - Stage 2: Next.js + TiDB + 多源实时数据
 - **v1.0** (2026-03-25) - Stage 1: Python HTTP Server + SQLite
