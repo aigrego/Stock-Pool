@@ -35,7 +35,7 @@ async function fetchSinaDailyKLine(code: string, market: string): Promise<KLineD
     
     // 解析返回的 JS 数据
     // 格式: var day_data = [[日期, 开盘, 最高, 最低, 收盘, 成交量], ...]
-    const match = text.match(/var\s+day_data\s*=\s*(\[.*?\]);/s);
+    const match = text.match(/var\s+day_data\s*=\s*(\[[\s\S]*?\]);/);
     if (!match) throw new Error('Invalid response format');
     
     const data = JSON.parse(match[1]);

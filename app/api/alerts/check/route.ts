@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       const stockConfig = {
         code: stock.code,
         name: stock.name,
-        cost: stock.cost,
+        cost: Number(stock.cost),
         alerts
       };
       

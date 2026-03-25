@@ -35,7 +35,7 @@ export function StockDetailModal({ stock, open, onOpenChange }: StockDetailModal
             </div>
             <div className="flex gap-2">
               <Badge variant="outline" className="text-lg px-3 py-1">
-                {stock.market.toUpperCase()}
+                {(stock.market || 'unknown').toUpperCase()}
               </Badge>
               <Badge 
                 variant="outline" 
@@ -144,7 +144,7 @@ export function StockDetailModal({ stock, open, onOpenChange }: StockDetailModal
         <div className="mt-6">
           <StockChart 
             code={stock.code} 
-            market={stock.market} 
+            market={stock.market || 'sh'} 
             name={stock.name}
           />
         </div>
