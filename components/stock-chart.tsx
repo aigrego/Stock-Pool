@@ -366,8 +366,7 @@ export function StockChart({ code, market, name }: StockChartProps) {
           {/* RSI */}
           <TabsContent value="rsi" className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData}
-003e
+              <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                 <XAxis 
                   dataKey="date" 
