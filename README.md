@@ -124,8 +124,13 @@ vercel --prod
 
 ### 环境变量
 
+支持两种配置方式（优先使用 `DATABASE_URL`）：
+
 ```bash
-# 数据库 (必需)
+# 方式1: DATABASE_URL (推荐)
+DATABASE_URL=mysql://user:password@host:port/stockpool?ssl=true
+
+# 方式2: 分开配置（当 DATABASE_URL 不存在时使用）
 DB_HOST=xxx.tidbcloud.com
 DB_PORT=4000
 DB_USER=xxx
@@ -135,7 +140,6 @@ TIDB_SSL=true
 
 # 飞书推送 (可选)
 FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
-FEISHU_USER_ID=ou_xxx
 ```
 
 ### Vercel Cron 配置
