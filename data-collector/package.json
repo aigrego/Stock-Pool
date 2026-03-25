@@ -1,0 +1,21 @@
+{
+  "name": "stock-data-collector",
+  "version": "1.0.0",
+  "description": "股票数据收集器 - 定时抓取行情并推送到股票管理系统",
+  "main": "collector.ts",
+  "scripts": {
+    "start": "ts-node collector.ts",
+    "dev": "ts-node-dev --respawn collector.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.4",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5"
+  }
+}
