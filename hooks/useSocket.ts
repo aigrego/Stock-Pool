@@ -31,9 +31,11 @@ export function useSocket(options: UseSocketOptions = {}) {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
+    // Socket.io 服务端地址 (kimiclaw)
+    const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://100.111.204.29:3001';
+    
     // 初始化 Socket.io 连接
-    const socket = io({
-      path: '/api/socket',
+    const socket = io(SOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 10,
