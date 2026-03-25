@@ -2,7 +2,7 @@
 
 在 Tailnet 网络内共享股票池配置，提供 Web 管理界面和 REST API。
 
-> 🆕 **新版 Web 界面**: `web/` 目录包含基于 Next.js + TiDB 的全新版本（阶段 1 已完成）
+> 🆕 **新版 Web 界面**: `web/` 目录包含基于 Next.js + TiDB 的全新版本（推荐）
 
 ## 🏗️ 架构
 
@@ -15,8 +15,9 @@
         │
         ▼
 ┌─────────────────┐
-│   Web UI        │ 浏览器访问
-│   + REST API    │
+│   Next.js       │ 
+│   Web UI + API  │ ───► TiDB Serverless
+│                 │      (MySQL)
 └─────────────────┘
 ```
 
@@ -24,13 +25,22 @@
 
 ```
 shared-stockpool/
-├── server.py              # HTTP API 服务器 (Python stdlib)
-├── static/index.html      # 原版 Web UI (已弃用)
 ├── web/                   # 🆕 Next.js + TiDB 新版 (推荐)
-│   ├── app/              # Next.js App Router
-│   ├── components/ui/    # shadcn/ui 组件
-│   ├── lib/db.ts         # TiDB 数据库连接
-│   └── README.md         # Web 版详细文档
+│   ├── app/              
+│   │   ├── api/
+│   │   │   ├── stocks/route.ts      # 股票 CRUD API
+│   │   │   ├── stocks/[code]/route.ts  # 单个股票操作
+│   │   │   ├── stats/route.ts       # 统计数据
+│   │   │   └── realtime/route.ts    # 实时股价 (新浪API轮询)
+│   │   ├── page.tsx        # 主页面 (Dashboard + Table)
+│   │   ├── layout.tsx      # 根布局
+│   │   └── globals.css     # 暗黑主题设计系统
+│   ├── components/ui/      # shadcn/ui 组件
+│   ├── lib/db.ts           # TiDB 数据库连接
+│   ├── hooks/useRealtimeData.ts  # 实时数据轮询 Hook
+│   └── README.md           # Web 版详细文档
+├── server.py              # 原版 Python API 服务器 (已弃用)
+├── static/index.html      # 原版 Web UI (已弃用)
 ├── client.py              # Python 客户端库
 ├── control.sh             # 服务管理脚本
 ├── import_tool.py         # 同花顺导入工具
@@ -39,14 +49,7 @@ shared-stockpool/
 
 ## 🚀 快速开始
 
-### 原版 Python 服务器 (稳定)
-
-```bash
-./control.sh start
-# 访问 http://100.111.204.29:8080
-```
-
-### 🆕 新版 Next.js + TiDB (推荐)
+### Next.js + TiDB 新版 (推荐)
 
 ```bash
 cd web
@@ -57,15 +60,16 @@ npm run dev
 # 访问 http://localhost:3000
 ```
 
-详见: [web/README.md](web/README.md)
-
-## 🖥️ Web 界面功能 (新版)
+## 🖥️ Web 界面功能
 
 - 📊 **仪表盘** - 4 卡片统计布局
+- 📈 **实时股价** - 5秒轮询新浪财经数据
+- 💰 **持仓盈亏** - 实时计算成本vs现价盈亏
 - 🔍 **搜索筛选** - 实时搜索 + 类型/市场筛选  
 - ➕ **添加股票** - 弹窗表单，含预警配置
 - ✏️ **编辑股票** - 点击编辑，数据回填
 - 🗑️ **删除股票** - 确认删除
+- 🔔 **浏览器通知** - 桌面提醒支持
 - 🌙 **暗黑主题** - 专业金融仪表盘设计
 - 📱 **响应式** - 移动端优化
 
@@ -74,7 +78,19 @@ npm run dev
 - Next.js 14 + TypeScript
 - Tailwind CSS + shadcn/ui
 - TiDB Serverless (MySQL)
-- Recharts (图表预留)
+- 新浪财经 API (实时数据)
+- Serverless 轮询架构
+
+## 📡 API 端点
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/api/stocks` | 获取所有股票 |
+| POST | `/api/stocks` | 创建股票 |
+| PUT | `/api/stocks/{code}` | 更新股票 |
+| DELETE | `/api/stocks/{code}` | 删除股票 |
+| GET | `/api/stats` | 获取统计数据 |
+| GET | `/api/realtime` | 获取实时股价 |
 
 ## 🛠️ 部署
 
@@ -85,37 +101,30 @@ cd web
 vercel --prod
 ```
 
-配置环境变量: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `TIDB_SSL`
+配置环境变量:
+```
+DB_HOST=your-tidb-serverless-host.tidbcloud.com
+DB_PORT=4000
+DB_USER=your-username
+DB_PASSWORD=your-password
+DB_NAME=stockpool
+TIDB_SSL=true
+```
 
 详见: [web/README.md](web/README.md)
 
 ---
 
-## 原版 API 文档
+## 原版 Python 服务器 (已弃用)
 
-> 以下文档适用于 Python 服务器 (`server.py`)
-
-### REST API 端点
-
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/health` | 健康检查 |
-| GET | `/api/watchlist` | 获取所有股票 |
-| POST | `/api/watchlist` | 创建股票 |
-| PUT | `/api/watchlist` | 更新股票 |
-| DELETE | `/api/watchlist/{code}` | 删除股票 |
-
-### 请求示例
+如需使用原版的 Python HTTP 服务器 + SQLite:
 
 ```bash
-# 获取股票列表
-curl http://100.111.204.29:8080/api/watchlist
-
-# 创建股票
-curl -X POST http://100.111.204.29:8080/api/watchlist \
-  -H "Content-Type: application/json" \
-  -d '{"code":"600519","name":"贵州茅台","market":"sh","type":"individual","cost":1500}'
+./control.sh start
+# 访问 http://100.111.204.29:8080
 ```
+
+API 文档见原 README 历史版本。
 
 ## 🔄 同花顺自选股同步
 
@@ -136,5 +145,5 @@ python3 import_tool.py add
 
 ## 📝 版本历史
 
-- **v2.0** (2026-03-25) - Next.js + TiDB 新版 Web 界面
+- **v2.0** (2026-03-25) - Next.js + TiDB + 新浪财经实时数据 (轮询架构)
 - **v1.0** (2026-03-25) - Python HTTP Server + SQLite 原版

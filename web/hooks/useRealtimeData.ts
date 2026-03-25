@@ -5,92 +5,78 @@ import { useEffect, useState, useCallback } from 'react';
 export interface RealtimeStock {
   code: string;
   name: string;
-  market: string;
-  type: string;
-  cost: number;
-  current: number;
   open: number;
   close: number;
+  current: number;
   high: number;
   low: number;
-  change_pct: number;
   volume: number;
   amount: number;
-  pnl_pct: number;
-  pnl_amount: number;
-  updated_at: string;
+  bid1: number;
+  ask1: number;
+  changePct: number;
+  pnlPct: number;
+  pnlAmount: number;
+  cost: number;
+  date: string;
+  time: string;
 }
 
-interface WebSocketMessage {
-  type: string;
-  data?: Record<string, RealtimeStock>;
-  timestamp?: string;
+interface UseRealtimeOptions {
+  interval?: number;  // 轮询间隔，默认 5000ms
+  enabled?: boolean;  // 是否启用，默认 true
 }
 
-export function useRealtimeData(wsUrl: string = 'ws://100.111.204.29:8765') {
+export function useRealtimeData(options: UseRealtimeOptions = {}) {
+  const { interval = 5000, enabled = true } = options;
+  
   const [data, setData] = useState<Record<string, RealtimeStock>>({});
-  const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const response = await fetch('/api/realtime');
+      if (!response.ok) throw new Error('Failed to fetch');
+      
+      const result = await response.json();
+      if (result.success) {
+        setData(result.data);
+        setLastUpdated(new Date());
+        setError(null);
+      }
+    } catch (e) {
+      setError('获取实时数据失败');
+      console.error('Realtime fetch error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectTimeout: NodeJS.Timeout;
+    if (!enabled) return;
 
-    const connect = () => {
-      try {
-        ws = new WebSocket(wsUrl);
+    // 立即执行一次
+    fetchData();
 
-        ws.onopen = () => {
-          console.log('✅ WebSocket connected');
-          setConnected(true);
-          setError(null);
-        };
+    // 定时轮询
+    const timer = setInterval(fetchData, interval);
 
-        ws.onmessage = (event) => {
-          try {
-            const message: WebSocketMessage = JSON.parse(event.data);
-            
-            if (message.type === 'market_data' && message.data) {
-              setData(prev => ({
-                ...prev,
-                ...message.data
-              }));
-            }
-          } catch (e) {
-            console.error('Failed to parse message:', e);
-          }
-        };
+    return () => clearInterval(timer);
+  }, [fetchData, interval, enabled]);
 
-        ws.onclose = () => {
-          console.log('🔌 WebSocket disconnected, reconnecting...');
-          setConnected(false);
-          reconnectTimeout = setTimeout(connect, 3000);
-        };
+  const refresh = useCallback(() => {
+    setLoading(true);
+    fetchData();
+  }, [fetchData]);
 
-        ws.onerror = (e) => {
-          console.error('WebSocket error:', e);
-          setError('Connection error');
-        };
-
-      } catch (e) {
-        setError('Failed to connect');
-        reconnectTimeout = setTimeout(connect, 3000);
-      }
-    };
-
-    connect();
-
-    return () => {
-      if (ws) {
-        ws.close();
-      }
-      clearTimeout(reconnectTimeout);
-    };
-  }, [wsUrl]);
-
-  const getStock = useCallback((code: string): RealtimeStock | undefined => {
-    return data[code];
-  }, [data]);
-
-  return { data, connected, error, getStock };
+  return {
+    data,
+    loading,
+    error,
+    lastUpdated,
+    refresh,
+    connected: !error  // 模拟连接状态
+  };
 }

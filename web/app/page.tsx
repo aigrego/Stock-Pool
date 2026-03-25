@@ -31,7 +31,7 @@ import { useRealtimeData } from '@/hooks/useRealtimeData';
 import { StockDetailModal } from '@/components/stock-detail-modal';
 import { 
   Plus, Search, RefreshCw, TrendingUp, Wallet, BarChart3, Globe, 
-  Edit2, Trash2, Bell, Wifi, WifiOff 
+  Edit2, Trash2, Bell, Activity, Clock
 } from 'lucide-react';
 
 export default function Home() {
@@ -47,8 +47,8 @@ export default function Home() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  // WebSocket 实时数据
-  const { data: realtimeData, connected } = useRealtimeData();
+  // 实时数据轮询（5秒间隔）
+  const { data: realtimeData, loading: realtimeLoading, lastUpdated, refresh: refreshRealtime } = useRealtimeData({ interval: 5000 });
 
   const [formData, setFormData] = useState<Partial<Stock>>({
     code: '',
@@ -203,15 +203,27 @@ export default function Home() {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* WebSocket 连接状态 */}
+            {/* 实时数据状态 */}
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
-              connected 
+              !realtimeLoading 
                 ? 'bg-green-500/10 border-green-500/30 text-green-400' 
-                : 'bg-red-500/10 border-red-500/30 text-red-400'
+                : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
             }`}>
-              {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-              <span className="text-sm hidden sm:inline">{connected ? '实时连接' : '离线'}</span>
+              <Activity className="w-4 h-4" />
+              <span className="text-sm hidden sm:inline">
+                {realtimeLoading ? '更新中...' : '实时'}
+              </span>
             </div>
+
+            {/* 最后更新时间 */}
+            {lastUpdated && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-muted/30 border-border text-muted-foreground">
+                <Clock className="w-4 h-4" />
+                <span className="text-sm hidden sm:inline">
+                  {lastUpdated.toLocaleTimeString('zh-CN', { hour12: false })}
+                </span>
+              </div>
+            )}
 
             {/* 通知按钮 */}
             <Button 
@@ -243,7 +255,7 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-mono">{stats.total}</div>
-              <p className="text-xs text-green-400 mt-1">{connected ? '实时更新中' : '静态数据'}</p>
+              <p className="text-xs text-green-400 mt-1">{lastUpdated ? '5秒刷新' : '加载中...'}</p>
             </CardContent>
           </Card>
 
