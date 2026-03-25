@@ -31,55 +31,80 @@ shared-stockpool/
 │   │   │   ├── stocks/route.ts      # 股票 CRUD API
 │   │   │   ├── stocks/[code]/route.ts  # 单个股票操作
 │   │   │   ├── stats/route.ts       # 统计数据
-│   │   │   └── realtime/route.ts    # 实时股价 (新浪API轮询)
-│   │   ├── page.tsx        # 主页面 (Dashboard + Table)
+│   │   │   ├── realtime/route.ts    # 实时股价 (多源轮询)
+│   │   │   └── alerts/              # 预警系统
+│   │   │       ├── check/route.ts   # 预警检查
+│   │   │       └── history/route.ts # 预警历史
+│   │   ├── page.tsx        # 主页面
 │   │   ├── layout.tsx      # 根布局
-│   │   └── globals.css     # 暗黑主题设计系统
+│   │   └── globals.css     # 暗黑主题
 │   ├── components/ui/      # shadcn/ui 组件
-│   ├── lib/db.ts           # TiDB 数据库连接
-│   ├── hooks/useRealtimeData.ts  # 实时数据轮询 Hook
-│   └── README.md           # Web 版详细文档
-├── server.py              # 原版 Python API 服务器 (已弃用)
-├── static/index.html      # 原版 Web UI (已弃用)
+│   ├── lib/
+│   │   ├── db.ts           # TiDB 数据库连接
+│   │   ├── alerts.ts       # 预警规则引擎
+│   │   └── feishu.ts       # 飞书推送服务
+│   ├── hooks/useRealtimeData.ts
+│   └── README.md
+├── server.py              # 原版 Python API (已弃用)
 ├── client.py              # Python 客户端库
-├── control.sh             # 服务管理脚本
-├── import_tool.py         # 同花顺导入工具
-└── stockpool.db           # SQLite 数据库 (原版)
+└── stockpool.db           # SQLite (原版)
 ```
 
 ## 🚀 快速开始
 
-### Next.js + TiDB 新版 (推荐)
+### Next.js + TiDB 新版
 
 ```bash
 cd web
 npm install
 cp .env.local.example .env.local
-# 配置 TiDB 连接信息
+# 配置 TiDB + 飞书 Webhook
 npm run dev
-# 访问 http://localhost:3000
 ```
 
 ## 🖥️ Web 界面功能
 
+### Stage 1: 基础管理
 - 📊 **仪表盘** - 4 卡片统计布局
-- 📈 **实时股价** - 5秒轮询新浪财经数据
-- 💰 **持仓盈亏** - 实时计算成本vs现价盈亏
 - 🔍 **搜索筛选** - 实时搜索 + 类型/市场筛选  
 - ➕ **添加股票** - 弹窗表单，含预警配置
 - ✏️ **编辑股票** - 点击编辑，数据回填
 - 🗑️ **删除股票** - 确认删除
+
+### Stage 2: 实时数据
+- 📈 **实时股价** - 5秒轮询多源数据
+- 🔄 **多数据源** - 新浪财经、腾讯、东方财富（故障自动切换）
+- 💰 **持仓盈亏** - 实时计算成本vs现价盈亏
 - 🔔 **浏览器通知** - 桌面提醒支持
-- 🌙 **暗黑主题** - 专业金融仪表盘设计
-- 📱 **响应式** - 移动端优化
+
+### Stage 3: 预警系统
+- ⚠️ **预警规则引擎** - 成本/日内涨跌/成交量监控
+- 📨 **飞书推送** - 自动发送卡片消息
+- 🕐 **定时检查** - Vercel Cron 每5分钟自动检查
+- 📜 **预警历史** - 24小时内预警记录查询
+- 🚫 **防重复** - 30分钟内相同预警不重复发送
+
+### 支持的预警规则
+
+| 规则 | 说明 | 严重级别 |
+|------|------|----------|
+| `cost_pct_above` | 成本盈利超过设定比例 | 提示 |
+| `cost_pct_below` | 成本亏损超过设定比例 | 警告/严重 |
+| `change_pct_above` | 日内涨幅超过设定比例 | 提示 |
+| `change_pct_below` | 日内跌幅超过设定比例 | 警告 |
+| `volume_surge` | 成交量放大超过设定倍数 | 提示 |
+| `ma_monitor` | 均线金叉死叉（预留） | - |
+| `rsi_monitor` | RSI超买超卖（预留） | - |
+| `gap_monitor` | 跳空缺口（预留） | - |
 
 ### 技术栈
 
 - Next.js 14 + TypeScript
 - Tailwind CSS + shadcn/ui
 - TiDB Serverless (MySQL)
-- 新浪财经 API (实时数据)
-- Serverless 轮询架构
+- 多数据源实时行情（新浪/腾讯/东财）
+- Vercel Cron（定时任务）
+- 飞书机器人 Webhook
 
 ## 📡 API 端点
 
@@ -91,59 +116,54 @@ npm run dev
 | DELETE | `/api/stocks/{code}` | 删除股票 |
 | GET | `/api/stats` | 获取统计数据 |
 | GET | `/api/realtime` | 获取实时股价 |
+| GET | `/api/alerts/check` | 手动触发预警检查 |
+| GET | `/api/alerts/history` | 获取预警历史 |
 
 ## 🛠️ 部署
 
-### Vercel (推荐)
+### Vercel
 
 ```bash
 cd web
 vercel --prod
 ```
 
-配置环境变量:
-```
-DB_HOST=your-tidb-serverless-host.tidbcloud.com
+### 环境变量
+
+```bash
+# 数据库 (必需)
+DB_HOST=xxx.tidbcloud.com
 DB_PORT=4000
-DB_USER=your-username
-DB_PASSWORD=your-password
+DB_USER=xxx
+DB_PASSWORD=xxx
 DB_NAME=stockpool
 TIDB_SSL=true
+
+# 飞书推送 (可选)
+FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+FEISHU_USER_ID=ou_xxx
 ```
 
-详见: [web/README.md](web/README.md)
+### Vercel Cron 配置
+
+已配置在 `vercel.json`:
+```json
+{
+  "crons": [
+    {
+      "path": "/api/alerts/check",
+      "schedule": "*/5 * * * 1-5"
+    }
+  ]
+}
+```
+
+每5分钟自动检查一次（仅工作日交易时段生效）
 
 ---
 
-## 原版 Python 服务器 (已弃用)
-
-如需使用原版的 Python HTTP 服务器 + SQLite:
-
-```bash
-./control.sh start
-# 访问 http://100.111.204.29:8080
-```
-
-API 文档见原 README 历史版本。
-
-## 🔄 同花顺自选股同步
-
-```bash
-# 从CSV导入
-python3 import_tool.py csv ~/Downloads/自选股20240325.csv
-
-# 交互式添加
-python3 import_tool.py add
-```
-
-详见: [THS_SYNC_GUIDE.md](THS_SYNC_GUIDE.md)
-
-## 🔒 安全说明
-
-- 服务绑定 `0.0.0.0:8080`，但仅 Tailscale 网络内可访问
-- 数据库文件权限: 600 (仅所有者可读写)
-
 ## 📝 版本历史
 
-- **v2.0** (2026-03-25) - Next.js + TiDB + 新浪财经实时数据 (轮询架构)
-- **v1.0** (2026-03-25) - Python HTTP Server + SQLite 原版
+- **v3.0** (2026-03-25) - Stage 3: 预警规则引擎 + 飞书推送
+- **v2.0** (2026-03-25) - Stage 2: Next.js + TiDB + 多源实时数据
+- **v1.0** (2026-03-25) - Stage 1: Python HTTP Server + SQLite
