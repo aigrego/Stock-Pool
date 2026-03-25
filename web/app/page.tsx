@@ -25,10 +25,14 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
-import { Stock, StockStats, MarketLabels, TypeLabels, MarketType, StockType, DefaultAlerts } from '@/types/stock';
-import { Plus, Search, RefreshCw, TrendingUp, Wallet, BarChart3, Globe, Edit2, Trash2 } from 'lucide-react';
+import { Stock, StockStats, TypeLabels, MarketType, StockType, DefaultAlerts } from '@/types/stock';
+import { useRealtimeData } from '@/hooks/useRealtimeData';
+import { StockDetailModal } from '@/components/stock-detail-modal';
+import { 
+  Plus, Search, RefreshCw, TrendingUp, Wallet, BarChart3, Globe, 
+  Edit2, Trash2, Bell, Wifi, WifiOff 
+} from 'lucide-react';
 
 export default function Home() {
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -39,8 +43,13 @@ export default function Home() {
   const [marketFilter, setMarketFilter] = useState<string>('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingStock, setEditingStock] = useState<Stock | null>(null);
+  const [detailStock, setDetailStock] = useState<any | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  // Form state
+  // WebSocket 实时数据
+  const { data: realtimeData, connected } = useRealtimeData();
+
   const [formData, setFormData] = useState<Partial<Stock>>({
     code: '',
     name: '',
@@ -49,6 +58,20 @@ export default function Home() {
     cost: 0,
     alerts: DefaultAlerts
   });
+
+  // 请求通知权限
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      setNotificationsEnabled(true);
+    }
+  }, []);
+
+  const requestNotification = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      setNotificationsEnabled(permission === 'granted');
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -74,7 +97,16 @@ export default function Home() {
     fetchData();
   }, []);
 
-  const filteredStocks = stocks.filter(stock => {
+  // 合并静态数据和实时数据
+  const mergedStocks = stocks.map(stock => {
+    const realtime = realtimeData[stock.code];
+    if (realtime) {
+      return { ...stock, ...realtime };
+    }
+    return stock;
+  });
+
+  const filteredStocks = mergedStocks.filter(stock => {
     const matchSearch = stock.code.toLowerCase().includes(search.toLowerCase()) ||
                        stock.name.toLowerCase().includes(search.toLowerCase());
     const matchType = !typeFilter || stock.type === typeFilter;
@@ -129,6 +161,11 @@ export default function Home() {
     setDialogOpen(true);
   };
 
+  const openDetail = (stock: any) => {
+    setDetailStock(stock);
+    setDetailOpen(true);
+  };
+
   const getMarketBadgeColor = (market: string) => {
     const colors: Record<string, string> = {
       sh: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
@@ -165,10 +202,32 @@ export default function Home() {
             </div>
           </div>
           
-          <Button onClick={openAdd} className="gap-2">
-            <Plus className="w-4 h-4" />
-            添加股票
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* WebSocket 连接状态 */}
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
+              connected 
+                ? 'bg-green-500/10 border-green-500/30 text-green-400' 
+                : 'bg-red-500/10 border-red-500/30 text-red-400'
+            }`}>
+              {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+              <span className="text-sm hidden sm:inline">{connected ? '实时连接' : '离线'}</span>
+            </div>
+
+            {/* 通知按钮 */}
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={requestNotification}
+              className={notificationsEnabled ? 'text-green-400' : ''}
+            >
+              <Bell className="w-4 h-4" />
+            </Button>
+
+            <Button onClick={openAdd} className="gap-2">
+              <Plus className="w-4 h-4" />
+              添加股票
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -184,7 +243,7 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-mono">{stats.total}</div>
-              <p className="text-xs text-green-400 mt-1">实时监控中</p>
+              <p className="text-xs text-green-400 mt-1">{connected ? '实时更新中' : '静态数据'}</p>
             </CardContent>
           </Card>
 
@@ -281,8 +340,8 @@ export default function Home() {
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">股票信息</TableHead>
                   <TableHead className="text-muted-foreground">市场</TableHead>
-                  <TableHead className="text-muted-foreground">类型</TableHead>
-                  <TableHead className="text-muted-foreground">持仓成本</TableHead>
+                  <TableHead className="text-muted-foreground">现价/涨跌</TableHead>
+                  <TableHead className="text-muted-foreground">持仓/盈亏</TableHead>
                   <TableHead className="text-muted-foreground">预警配置</TableHead>
                   <TableHead className="text-muted-foreground text-right">操作</TableHead>
                 </TableRow>
@@ -302,57 +361,100 @@ export default function Home() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredStocks.map((stock) => (
-                    <TableRow key={stock.code} className="border-border hover:bg-muted/50">
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-mono font-semibold">{stock.code}</span>
-                          <span className="text-sm text-muted-foreground">{stock.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getMarketBadgeColor(stock.market)}>
-                          {stock.market.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getTypeBadgeColor(stock.type)}>
-                          {TypeLabels[stock.type as StockType]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className={`font-mono font-semibold ${stock.cost > 0 ? 'text-yellow-400' : 'text-muted-foreground'}`}>
-                          {stock.cost > 0 ? `¥${stock.cost.toFixed(3)}` : '-'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {stock.alerts?.ma_monitor && (
-                            <Badge variant="secondary" className="text-xs">MA</Badge>
+                  filteredStocks.map((stock: any) => {
+                    const hasRealtime = stock.current > 0;
+                    const isUp = stock.change_pct > 0;
+                    const isProfit = stock.pnl_pct > 0;
+                    
+                    return (
+                      <TableRow 
+                        key={stock.code} 
+                        className="border-border hover:bg-muted/50 cursor-pointer"
+                        onClick={() => openDetail(stock)}
+                      >
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-mono font-semibold">{stock.code}</span>
+                            <span className="text-sm text-muted-foreground">{stock.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getMarketBadgeColor(stock.market)}>
+                            {stock.market.toUpperCase()}
+                          </Badge>
+                          <Badge variant="outline" className={`ml-1 ${getTypeBadgeColor(stock.type)}`}>
+                            {TypeLabels[stock.type as StockType]}
+                          </Badge>
+                        </TableCell>
+                        
+                        <TableCell>
+                          {hasRealtime ? (
+                            <div className="flex flex-col">
+                              <span className={`font-mono font-bold ${isUp ? 'text-green-400' : 'text-red-400'}`}>
+                                ¥{stock.current.toFixed(2)}
+                              </span>
+                              <span className={`text-xs ${isUp ? 'text-green-400' : 'text-red-400'}`}>
+                                {isUp ? '+' : ''}{stock.change_pct}%
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
                           )}
-                          {stock.alerts?.rsi_monitor && (
-                            <Badge variant="secondary" className="text-xs">RSI</Badge>
+                        </TableCell>
+                        
+                        <TableCell>
+                          {stock.cost > 0 ? (
+                            <div className="flex flex-col">
+                              <span className="font-mono text-yellow-400">¥{stock.cost.toFixed(3)}</span>
+                              {hasRealtime && (
+                                <span className={`text-xs ${isProfit ? 'text-green-400' : 'text-red-400'}`}>
+                                  {isProfit ? '+' : ''}{stock.pnl_pct}% ({isProfit ? '+' : ''}¥{stock.pnl_amount?.toFixed(2)})
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
                           )}
-                          {stock.alerts?.gap_monitor && (
-                            <Badge variant="secondary" className="text-xs">缺口</Badge>
-                          )}
-                          {stock.alerts?.trailing_stop && (
-                            <Badge variant="secondary" className="text-xs">追踪</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={() => openEdit(stock)}>
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDelete(stock.code)}>
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                        
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {stock.alerts?.ma_monitor && (
+                              <Badge variant="secondary" className="text-xs">MA</Badge>
+                            )}
+                            {stock.alerts?.rsi_monitor && (
+                              <Badge variant="secondary" className="text-xs">RSI</Badge>
+                            )}
+                            {stock.alerts?.gap_monitor && (
+                              <Badge variant="secondary" className="text-xs">缺口</Badge>
+                            )}
+                            {stock.alerts?.trailing_stop && (
+                              <Badge variant="secondary" className="text-xs">追踪</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={(e) => { e.stopPropagation(); openEdit(stock); }}
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              size="sm" 
+                              onClick={(e) => { e.stopPropagation(); handleDelete(stock.code); }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -505,6 +607,13 @@ export default function Home() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Stock Detail Modal */}
+      <StockDetailModal 
+        stock={detailStock} 
+        open={detailOpen} 
+        onOpenChange={setDetailOpen} 
+      />
     </div>
   );
 }
