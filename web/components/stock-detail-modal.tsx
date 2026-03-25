@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +9,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { RealtimeStock } from '@/hooks/useRealtimeData';
+import { StockChart } from './stock-chart';
 import { TrendingUp, TrendingDown, DollarSign, BarChart3, Clock } from 'lucide-react';
 
 interface StockDetailModalProps {
@@ -139,6 +139,15 @@ export function StockDetailModal({ stock, open, onOpenChange }: StockDetailModal
             </div>
           </div>
         )}
+
+        {/* K线图表 */}
+        <div className="mt-6">
+          <StockChart 
+            code={stock.code} 
+            market={stock.market} 
+            name={stock.name}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
