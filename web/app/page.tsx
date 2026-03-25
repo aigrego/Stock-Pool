@@ -29,9 +29,9 @@ import {
 import { Stock, StockStats, TypeLabels, MarketType, StockType, DefaultAlerts } from '@/types/stock';
 import { useRealtimeData } from '@/hooks/useRealtimeData';
 import { StockDetailModal } from '@/components/stock-detail-modal';
-import { 
-  Plus, Search, RefreshCw, TrendingUp, Wallet, BarChart3, Globe, 
-  Edit2, Trash2, Bell, Activity, Clock
+import {
+  Plus, Search, RefreshCw, TrendingUp, Wallet, BarChart3, Globe,
+  Edit2, Trash2, Bell, Activity, Clock, AlertTriangle, History
 } from 'lucide-react';
 
 export default function Home() {
@@ -46,6 +46,10 @@ export default function Home() {
   const [detailStock, setDetailStock] = useState<any | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [alertChecking, setAlertChecking] = useState(false);
+  const [alertResult, setAlertResult] = useState<any>(null);
+  const [alertHistoryOpen, setAlertHistoryOpen] = useState(false);
+  const [alertHistory, setAlertHistory] = useState<any[]>([]);
 
   // 实时数据轮询（5秒间隔）
   const { data: realtimeData, meta: realtimeMeta, loading: realtimeLoading, lastUpdated, refresh: refreshRealtime } = useRealtimeData({ interval: 5000 });
@@ -80,10 +84,10 @@ export default function Home() {
         fetch('/api/stocks'),
         fetch('/api/stats')
       ]);
-      
+
       const stocksData = await stocksRes.json();
       const statsData = await statsRes.json();
-      
+
       if (stocksData.success) setStocks(stocksData.data);
       if (statsData.success) setStats(statsData.data);
     } catch (error) {
@@ -116,17 +120,17 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const url = editingStock ? `/api/stocks/${editingStock.code}` : '/api/stocks';
     const method = editingStock ? 'PUT' : 'POST';
-    
+
     try {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-      
+
       if (res.ok) {
         setDialogOpen(false);
         setEditingStock(null);
@@ -140,7 +144,7 @@ export default function Home() {
 
   const handleDelete = async (code: string) => {
     if (!confirm(`确定要删除 ${code} 吗？`)) return;
-    
+
     try {
       await fetch(`/api/stocks/${code}`, { method: 'DELETE' });
       fetchData();
@@ -164,6 +168,41 @@ export default function Home() {
   const openDetail = (stock: any) => {
     setDetailStock(stock);
     setDetailOpen(true);
+  };
+
+  // 手动检查预警
+  const checkAlerts = async () => {
+    try {
+      setAlertChecking(true);
+      const res = await fetch('/api/alerts/check?force=true');
+      const result = await res.json();
+      setAlertResult(result);
+
+      if (result.alertsFound > 0) {
+        alert(`发现 ${result.alertsFound} 条预警！`);
+      } else {
+        alert('暂无预警触发');
+      }
+    } catch (error) {
+      console.error('Check alerts failed:', error);
+      alert('检查预警失败');
+    } finally {
+      setAlertChecking(false);
+    }
+  };
+
+  // 获取预警历史
+  const fetchAlertHistory = async () => {
+    try {
+      const res = await fetch('/api/alerts/history?hours=24');
+      const result = await res.json();
+      if (result.success) {
+        setAlertHistory(result.data);
+        setAlertHistoryOpen(true);
+      }
+    } catch (error) {
+      console.error('Fetch alert history failed:', error);
+    }
   };
 
   const getMarketBadgeColor = (market: string) => {
@@ -201,13 +240,13 @@ export default function Home() {
               <p className="text-xs text-muted-foreground">Stock Pool Manager</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             {/* 实时数据状态 */}
-            <div 
+            <div
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
-                !realtimeLoading 
-                  ? 'bg-green-500/10 border-green-500/30 text-green-400' 
+                !realtimeLoading
+                  ? 'bg-green-500/10 border-green-500/30 text-green-400'
                   : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
               }`}
               title={`数据源: ${realtimeMeta?.source || 'unknown'} | 成功: ${realtimeMeta?.count || 0}/${realtimeMeta?.total || 0}`}
@@ -228,9 +267,31 @@ export default function Home() {
               </div>
             )}
 
+            {/* 预警历史按钮 */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={fetchAlertHistory}
+              title="预警历史"
+            >
+              <History className="w-4 h-4" />
+            </Button>
+
+            {/* 手动检查预警按钮 */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={checkAlerts}
+              disabled={alertChecking}
+              title="检查预警"
+              className={alertResult?.alertsFound > 0 ? 'text-yellow-400' : ''}
+            >
+              <AlertTriangle className={`w-4 h-4 ${alertChecking ? 'animate-pulse' : ''}`} />
+            </Button>
+
             {/* 通知按钮 */}
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="icon"
               onClick={requestNotification}
               className={notificationsEnabled ? 'text-green-400' : ''}
@@ -314,7 +375,7 @@ export default function Home() {
                 className="pl-10 bg-card border-border"
               />
             </div>
-            
+
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-[140px] bg-card border-border">
                 <SelectValue placeholder="全部类型" />
@@ -340,7 +401,7 @@ export default function Home() {
               </SelectContent>
             </Select>
           </div>
-          
+
           <Button variant="outline" onClick={fetchData} disabled={loading} className="gap-2">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             刷新
@@ -380,10 +441,10 @@ export default function Home() {
                     const hasRealtime = stock.current > 0;
                     const isUp = stock.change_pct > 0;
                     const isProfit = stock.pnl_pct > 0;
-                    
+
                     return (
-                      <TableRow 
-                        key={stock.code} 
+                      <TableRow
+                        key={stock.code}
                         className="border-border hover:bg-muted/50 cursor-pointer"
                         onClick={() => openDetail(stock)}
                       >
@@ -401,7 +462,7 @@ export default function Home() {
                             {TypeLabels[stock.type as StockType]}
                           </Badge>
                         </TableCell>
-                        
+
                         <TableCell>
                           {hasRealtime ? (
                             <div className="flex flex-col">
@@ -416,7 +477,7 @@ export default function Home() {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
-                        
+
                         <TableCell>
                           {stock.cost > 0 ? (
                             <div className="flex flex-col">
@@ -431,7 +492,7 @@ export default function Home() {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
-                        
+
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {stock.alerts?.ma_monitor && (
@@ -448,19 +509,19 @@ export default function Home() {
                             )}
                           </div>
                         </TableCell>
-                        
+
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={(e) => { e.stopPropagation(); openEdit(stock); }}
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </Button>
-                            <Button 
-                              variant="destructive" 
-                              size="sm" 
+                            <Button
+                              variant="destructive"
+                              size="sm"
                               onClick={(e) => { e.stopPropagation(); handleDelete(stock.code); }}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -483,7 +544,7 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle>{editingStock ? '编辑股票' : '添加股票'}</DialogTitle>
           </DialogHeader>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -512,8 +573,8 @@ export default function Home() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">市场 *</label>
-                <Select 
-                  value={formData.market} 
+                <Select
+                  value={formData.market}
                   onValueChange={(v) => setFormData({ ...formData, market: v as MarketType })}
                 >
                   <SelectTrigger className="bg-background border-border">
@@ -531,8 +592,8 @@ export default function Home() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">类型 *</label>
-                <Select 
-                  value={formData.type} 
+                <Select
+                  value={formData.type}
                   onValueChange={(v) => setFormData({ ...formData, type: v as StockType })}
                 >
                   <SelectTrigger className="bg-background border-border">
@@ -624,11 +685,69 @@ export default function Home() {
       </Dialog>
 
       {/* Stock Detail Modal */}
-      <StockDetailModal 
-        stock={detailStock} 
-        open={detailOpen} 
-        onOpenChange={setDetailOpen} 
+      <StockDetailModal
+        stock={detailStock}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
       />
+
+      {/* Alert History Dialog */}
+      <Dialog open={alertHistoryOpen} onOpenChange={setAlertHistoryOpen}>
+        <DialogContent className="bg-card border-border max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              预警历史 (24小时内)
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="mt-4">
+            {alertHistory.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                暂无预警记录
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {alertHistory.map((alert: any) => (
+                  <div
+                    key={alert.id}
+                    className={`p-3 rounded-lg border ${
+                      alert.severity === 'critical'
+                        ? 'bg-red-500/10 border-red-500/30'
+                        : alert.severity === 'warning'
+                        ? 'bg-yellow-500/10 border-yellow-500/30'
+                        : 'bg-blue-500/10 border-blue-500/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-semibold">{alert.code}</span>
+                        <span className="text-muted-foreground">{alert.stock_name}</span>
+                        <Badge
+                          variant="outline"
+                          className={
+                            alert.severity === 'critical'
+                              ? 'text-red-400 border-red-400/30'
+                              : alert.severity === 'warning'
+                              ? 'text-yellow-400 border-yellow-400/30'
+                              : 'text-blue-400 border-blue-400/30'
+                          }
+                        >
+                          {alert.severity === 'critical' ? '严重' : alert.severity === 'warning' ? '警告' : '提示'}
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(alert.created_at).toLocaleString('zh-CN')}
+                      </span>
+                    </div>
+                    <p className="text-sm mt-1">{alert.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
